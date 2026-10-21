@@ -1,0 +1,937 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vale Dashboard</title>
+<meta name="description" content="Dashboard de cotações da Vale (VALE3 / VALE) com dados do Yahoo Finance.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232a78d6'/%3E%3Cpath d='M6 22l6-7 5 4 9-11' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<style>
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7;
+    --surface: #fcfcfb;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #898781;
+    --grid: #e1e0d9;
+    --axis: #c3c2b7;
+    --border: rgba(11, 11, 11, 0.10);
+    --hover: rgba(11, 11, 11, 0.05);
+    --series-1: #2a78d6;
+    --series-2: #eb6834;
+    --series-3: #1baf7a;
+    --volume: #b7d3f6;
+    --up: #006300;
+    --down: #d03b3b;
+    --error-bg: #fdf0ef;
+    --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --page: #0d0d0d;
+      --surface: #1a1a19;
+      --text-primary: #f0efec;
+      --text-secondary: #c3c2b7;
+      --text-muted: #898781;
+      --grid: #2c2c2a;
+      --axis: #383835;
+      --border: rgba(255, 255, 255, 0.10);
+      --hover: rgba(255, 255, 255, 0.06);
+      --series-1: #3987e5;
+      --series-2: #d95926;
+      --series-3: #199e70;
+      --volume: #184f95;
+      --up: #0ca30c;
+      --down: #e66767;
+      --error-bg: #2a1716;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --text-primary: #f0efec;
+    --text-secondary: #c3c2b7;
+    --text-muted: #898781;
+    --grid: #2c2c2a;
+    --axis: #383835;
+    --border: rgba(255, 255, 255, 0.10);
+    --hover: rgba(255, 255, 255, 0.06);
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --volume: #184f95;
+    --up: #0ca30c;
+    --down: #e66767;
+    --error-bg: #2a1716;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--page);
+    color: var(--text-primary);
+    font-family: var(--font);
+    font-size: 14px;
+    line-height: 1.45;
+  }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 24px 16px 48px; }
+
+  header.top {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px;
+    justify-content: space-between; margin-bottom: 20px;
+  }
+  .brand h1 { margin: 0; font-size: 20px; font-weight: 650; letter-spacing: -0.01em; }
+  .brand p { margin: 2px 0 0; color: var(--text-secondary); font-size: 13px; }
+  .controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+  .seg {
+    display: inline-flex; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 2px; gap: 2px; flex-wrap: wrap;
+  }
+  .seg button, .icon-btn {
+    font: inherit; font-size: 13px; color: var(--text-secondary); background: transparent;
+    border: 0; border-radius: 6px; padding: 5px 10px; cursor: pointer; min-height: 30px;
+  }
+  .seg button:hover, .icon-btn:hover { background: var(--hover); color: var(--text-primary); }
+  .seg button[aria-pressed="true"] {
+    background: var(--text-primary); color: var(--surface); font-weight: 600;
+  }
+  .icon-btn { border: 1px solid var(--border); background: var(--surface); }
+  button:focus-visible { outline: 2px solid var(--series-1); outline-offset: 2px; }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px;
+  }
+  .card h2 { margin: 0; font-size: 15px; font-weight: 600; }
+  .card .sub { margin: 2px 0 0; color: var(--text-muted); font-size: 12px; }
+  .card-head {
+    display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: flex-start;
+    justify-content: space-between; margin-bottom: 12px;
+  }
+
+  .hero { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; margin-bottom: 16px; }
+  .hero .price { font-size: 40px; font-weight: 650; letter-spacing: -0.02em; }
+  .hero .chg { font-size: 17px; font-weight: 600; }
+  .hero .when { color: var(--text-muted); font-size: 13px; width: 100%; }
+
+  .up { color: var(--up); }
+  .down { color: var(--down); }
+  .flat { color: var(--text-secondary); }
+
+  .tiles {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    gap: 12px; margin-bottom: 16px;
+  }
+  .tile .label { color: var(--text-secondary); font-size: 12px; }
+  .tile .value { font-size: 20px; font-weight: 600; margin-top: 2px; }
+  .tile .note { color: var(--text-muted); font-size: 12px; margin-top: 2px; }
+  .range-bar { position: relative; height: 6px; border-radius: 3px; background: var(--grid); margin: 8px 0 4px; }
+  .range-bar span {
+    position: absolute; top: -3px; width: 12px; height: 12px; border-radius: 50%;
+    background: var(--series-1); border: 2px solid var(--surface); transform: translateX(-50%);
+  }
+  .range-ends { display: flex; justify-content: space-between; color: var(--text-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr; gap: 16px; margin-top: 16px; }
+  .grid-2 > * { min-width: 0; }
+  @media (min-width: 900px) { .grid-2 { grid-template-columns: 1fr 1fr; } }
+
+  .chart { position: relative; width: 100%; touch-action: pan-y; }
+  .chart svg { display: block; width: 100%; overflow: visible; }
+  .chart text { font-family: var(--font); font-size: 11px; fill: var(--text-muted); font-variant-numeric: tabular-nums; }
+  .chart .end-label { fill: var(--text-primary); font-size: 12px; font-weight: 600; }
+  .tooltip {
+    position: absolute; pointer-events: none; z-index: 5; min-width: 150px;
+    background: var(--surface); color: var(--text-primary); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 10px; font-size: 12px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12); opacity: 0; transition: opacity .08s;
+  }
+  .tooltip.show { opacity: 1; }
+  .tooltip .tt-title { color: var(--text-secondary); margin-bottom: 4px; }
+  .tooltip .tt-row { display: flex; justify-content: space-between; gap: 12px; font-variant-numeric: tabular-nums; }
+  .tooltip .tt-row b { font-weight: 600; }
+  .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--text-secondary); }
+  .legend label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+  .legend .line-key { display: inline-block; width: 14px; height: 2px; border-radius: 1px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 7px 8px; text-align: right; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--text-secondary); font-weight: 500; font-size: 12px; }
+  td { font-variant-numeric: tabular-nums; }
+  tbody tr:hover { background: var(--hover); }
+  .table-scroll { overflow-x: auto; }
+
+  details.table-view { margin-top: 10px; }
+  details.table-view summary { cursor: pointer; color: var(--text-secondary); font-size: 12px; }
+
+  .status { padding: 12px 14px; border-radius: 8px; background: var(--error-bg); border: 1px solid var(--border); margin-bottom: 16px; }
+  .status[hidden] { display: none; }
+  .loading { color: var(--text-muted); padding: 40px 0; text-align: center; }
+
+  footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
+  footer a { color: var(--text-secondary); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <h1 id="company">Vale S.A.</h1>
+      <p id="exchange">Carregando dados do Yahoo Finance…</p>
+    </div>
+    <div class="controls">
+      <div class="seg" role="group" aria-label="Ativo" id="symbol-seg">
+        <button data-symbol="VALE3.SA" aria-pressed="true">VALE3 · B3</button>
+        <button data-symbol="VALE" aria-pressed="false">VALE · NYSE</button>
+      </div>
+      <button class="icon-btn" id="theme-btn" title="Alternar tema" aria-label="Alternar tema claro/escuro">◐ Tema</button>
+    </div>
+  </header>
+
+  <div class="status" id="status" role="alert" hidden></div>
+
+  <section class="hero" aria-live="polite">
+    <span class="price" id="price">—</span>
+    <span class="chg" id="change"></span>
+    <span class="when" id="when"></span>
+  </section>
+
+  <section class="tiles" id="tiles"></section>
+
+  <section class="card">
+    <div class="card-head">
+      <div>
+        <h2>Cotação</h2>
+        <p class="sub" id="price-sub">Preço de fechamento e volume negociado</p>
+      </div>
+      <div class="seg" role="group" aria-label="Período" id="range-seg"></div>
+    </div>
+    <div class="legend" id="ma-legend" style="margin-bottom:8px">
+      <span><span class="line-key" style="background:var(--series-1)"></span> Preço</span>
+      <label><input type="checkbox" id="ma20"> <span class="line-key" style="background:var(--series-2)"></span> Média móvel 20</label>
+      <label><input type="checkbox" id="ma50"> <span class="line-key" style="background:var(--series-3)"></span> Média móvel 50</label>
+    </div>
+    <div class="chart" id="price-chart"><div class="loading">Carregando…</div></div>
+    <div class="chart" id="volume-chart"></div>
+  </section>
+
+  <div class="grid-2">
+    <section class="card">
+      <div class="card-head">
+        <div>
+          <h2>Desempenho vs. Ibovespa</h2>
+          <p class="sub">Retorno total (com proventos), base 100 no início do período</p>
+        </div>
+      </div>
+      <div class="legend" id="cmp-legend" style="margin-bottom:8px"></div>
+      <div class="chart" id="compare-chart"></div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <div>
+          <h2>Rentabilidade</h2>
+          <p class="sub">Retorno total por período (preço ajustado por proventos)</p>
+        </div>
+      </div>
+      <div class="table-scroll"><table id="returns-table"></table></div>
+      <div class="tiles" id="risk-tiles" style="margin:14px 0 0"></div>
+    </section>
+  </div>
+
+  <div class="grid-2">
+    <section class="card">
+      <div class="card-head">
+        <div>
+          <h2>Proventos por ano</h2>
+          <p class="sub" id="div-sub">Soma dos dividendos e JCP por ação</p>
+        </div>
+      </div>
+      <div class="chart" id="div-chart"></div>
+      <details class="table-view">
+        <summary>Ver últimos proventos</summary>
+        <div class="table-scroll"><table id="div-table"></table></div>
+      </details>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <div>
+          <h2>Histórico diário</h2>
+          <p class="sub">Últimos 15 pregões</p>
+        </div>
+      </div>
+      <div class="table-scroll"><table id="hist-table"></table></div>
+    </section>
+  </div>
+
+  <footer>
+    <p>Fonte: Yahoo Finance. Dados com atraso e apenas para fins informativos — não é recomendação de investimento.
+      <span id="updated"></span></p>
+  </footer>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  // ---------- Configuração ----------
+  const BENCHMARK = "^BVSP";
+  const SERIES = {
+    intraday: { range: "1d", interval: "5m" },
+    week: { range: "5d", interval: "15m" },
+    daily: { range: "max", interval: "1d", events: "div,split" },
+  };
+  // Fallback quando data/*.json não existe (ex.: abrindo localmente):
+  // busca direto no Yahoo através de um proxy CORS público.
+  const CORS_PROXY = "https://corsproxy.io/?url=";
+
+  const DAY = 86400;
+  const RANGES = [
+    { key: "1D", label: "1D", source: "intraday" },
+    { key: "5D", label: "5D", source: "week" },
+    { key: "1M", label: "1M", source: "daily", days: 30 },
+    { key: "6M", label: "6M", source: "daily", days: 182 },
+    { key: "YTD", label: "No ano", source: "daily", ytd: true },
+    { key: "1A", label: "1A", source: "daily", days: 365 },
+    { key: "5A", label: "5A", source: "daily", days: 365 * 5 },
+    { key: "MAX", label: "Máx", source: "daily" },
+  ];
+
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch { /* sem storage */ } },
+  };
+
+  const state = {
+    symbol: store.get("vale.symbol") || "VALE3.SA",
+    range: store.get("vale.range") || "6M",
+    data: {}, // cache: `${symbol}|${series}` -> dados
+  };
+
+  // ---------- Carregamento ----------
+  const fileName = (symbol, series) => `${symbol.replace("^", "")}_${series}.json`;
+
+  async function loadSeries(symbol, series) {
+    const key = `${symbol}|${series}`;
+    if (state.data[key]) return state.data[key];
+    let data;
+    try {
+      const r = await fetch(`data/${fileName(symbol, series)}`, { cache: "no-cache" });
+      if (!r.ok) throw new Error(r.status);
+      data = await r.json();
+    } catch {
+      data = await loadLive(symbol, series);
+    }
+    data.rows = data.rows.map(r => ({ t: r[0], open: r[1], high: r[2], low: r[3], close: r[4], volume: r[5], adj: r[6] }));
+    state.data[key] = data;
+    return data;
+  }
+
+  async function loadLive(symbol, series) {
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?` +
+      new URLSearchParams(SERIES[series]);
+    const r = await fetch(CORS_PROXY + encodeURIComponent(url));
+    if (!r.ok) throw new Error(`Yahoo ${symbol}: HTTP ${r.status}`);
+    const res = (await r.json()).chart.result[0];
+    const q = res.indicators.quote[0];
+    const adj = res.indicators.adjclose?.[0]?.adjclose;
+    const rows = [];
+    (res.timestamp || []).forEach((t, i) => {
+      if (q.close[i] == null) return;
+      rows.push([t, q.open[i], q.high[i], q.low[i], q.close[i], q.volume[i] || 0, adj ? adj[i] : q.close[i]]);
+    });
+    const divs = Object.values(res.events?.dividends || {}).map(d => [d.date, d.amount]).sort((a, b) => a[0] - b[0]);
+    return { meta: res.meta, rows, dividends: divs, splits: [], live: true };
+  }
+
+  // ---------- Formatação ----------
+  const nf = (d) => new Intl.NumberFormat("pt-BR", { minimumFractionDigits: d, maximumFractionDigits: d });
+  const fmt2 = nf(2);
+  const fmtCompact = new Intl.NumberFormat("pt-BR", { notation: "compact", maximumFractionDigits: 1 });
+  const money = (v, cur) => v == null ? "—" :
+    new Intl.NumberFormat("pt-BR", { style: "currency", currency: cur || "BRL" }).format(v);
+  const pct = (v) => v == null || !isFinite(v) ? "—" : `${v > 0 ? "+" : ""}${fmt2.format(v * 100)}%`;
+  const dir = (v) => v == null || !isFinite(v) || Math.abs(v) < 1e-9 ? "flat" : v > 0 ? "up" : "down";
+  const arrow = (v) => ({ up: "▲ ", down: "▼ ", flat: "" })[dir(v)];
+  const signed = (v) => `<span class="${dir(v)}">${arrow(v)}${pct(v)}</span>`;
+
+  let tz = "America/Sao_Paulo";
+  const dateFmt = (opts) => new Intl.DateTimeFormat("pt-BR", { timeZone: tz, ...opts });
+  const fmtDate = (t) => dateFmt({ day: "2-digit", month: "2-digit", year: "numeric" }).format(t * 1000);
+  const fmtDateShort = (t) => dateFmt({ day: "2-digit", month: "short" }).format(t * 1000).replace(".", "");
+  const fmtMonthYear = (t) => dateFmt({ month: "short", year: "2-digit" }).format(t * 1000).replace(".", "");
+  const fmtYear = (t) => dateFmt({ year: "numeric" }).format(t * 1000);
+  const fmtTime = (t) => dateFmt({ hour: "2-digit", minute: "2-digit" }).format(t * 1000);
+  const fmtDateTime = (t) => dateFmt({ day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(t * 1000);
+  const dayKey = (t) => new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(t * 1000);
+
+  // ---------- Cálculos ----------
+  function sliceRange(rows, range) {
+    if (!rows.length) return rows;
+    const last = rows[rows.length - 1].t;
+    let from = -Infinity;
+    if (range.days) from = last - range.days * DAY;
+    if (range.ytd) {
+      const y = fmtYear(last);
+      const i = rows.findIndex(r => fmtYear(r.t) === y);
+      return rows.slice(Math.max(0, i - 1)); // inclui o último pregão do ano anterior
+    }
+    return rows.filter(r => r.t >= from);
+  }
+
+  function movingAverage(values, n) {
+    const out = new Array(values.length).fill(null);
+    let sum = 0;
+    for (let i = 0; i < values.length; i++) {
+      sum += values[i];
+      if (i >= n) sum -= values[i - n];
+      if (i >= n - 1) out[i] = sum / n;
+    }
+    return out;
+  }
+
+  function returnSince(rows, fromT) {
+    if (!rows.length) return null;
+    const last = rows[rows.length - 1];
+    let ref = null;
+    for (const r of rows) { if (r.t <= fromT) ref = r; else break; }
+    if (!ref) return null;
+    return last.adj / ref.adj - 1;
+  }
+
+  function annualVol(rows) {
+    const rets = [];
+    for (let i = 1; i < rows.length; i++) rets.push(Math.log(rows[i].adj / rows[i - 1].adj));
+    if (rets.length < 2) return null;
+    const m = rets.reduce((a, b) => a + b, 0) / rets.length;
+    const v = rets.reduce((a, b) => a + (b - m) ** 2, 0) / (rets.length - 1);
+    return Math.sqrt(v * 252);
+  }
+
+  function maxDrawdown(rows) {
+    let peak = -Infinity, mdd = 0;
+    for (const r of rows) {
+      peak = Math.max(peak, r.adj);
+      mdd = Math.min(mdd, r.adj / peak - 1);
+    }
+    return mdd;
+  }
+
+  // ---------- Gráficos (SVG) ----------
+  const SVGNS = "http://www.w3.org/2000/svg";
+  const el = (tag, attrs = {}, parent) => {
+    const n = document.createElementNS(SVGNS, tag);
+    for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+    if (parent) parent.appendChild(n);
+    return n;
+  };
+
+  function niceTicks(min, max, count = 4) {
+    const span = max - min || Math.abs(max) || 1;
+    const raw = span / count;
+    const mag = 10 ** Math.floor(Math.log10(raw));
+    const step = [1, 2, 2.5, 5, 10].map(s => s * mag).find(s => span / s <= count) || 10 * mag;
+    const ticks = [];
+    for (let v = Math.ceil(min / step) * step; v <= max + 1e-9; v += step) ticks.push(+v.toFixed(10));
+    return ticks;
+  }
+
+  function xTickIndices(n, maxTicks) {
+    if (n <= 1) return [0];
+    const k = Math.min(maxTicks, n);
+    return [...new Set(Array.from({ length: k }, (_, i) => Math.round(i * (n - 1) / (k - 1))))];
+  }
+
+  /**
+   * Gráfico de linhas com eixo x por índice (pregões contíguos, sem buracos
+   * de fim de semana) e tooltip com crosshair.
+   */
+  function lineChart(container, o) {
+    container.innerHTML = "";
+    const n = o.times.length;
+    if (!n) { container.innerHTML = '<div class="loading">Sem dados para o período.</div>'; return; }
+    const W = container.clientWidth || 600, H = o.height || 280;
+    const m = { l: 4, r: 58, t: 12, b: o.hideX ? 6 : 24 };
+    const pw = W - m.l - m.r, ph = H - m.t - m.b;
+
+    let lo = Infinity, hi = -Infinity;
+    for (const s of o.series) for (const v of s.values) if (v != null) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
+    if (o.bars) for (const v of o.bars) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
+    if (o.baseline != null) { lo = Math.min(lo, o.baseline); hi = Math.max(hi, o.baseline); }
+    const pad = (hi - lo) * 0.08 || Math.abs(hi) * 0.01 || 1;
+    lo -= pad; hi += pad;
+    if (o.zeroBased) { lo = 0; hi -= pad / 2; }
+
+    const x = (i) => m.l + (n === 1 ? pw / 2 : (i / (n - 1)) * pw);
+    const y = (v) => m.t + (1 - (v - lo) / (hi - lo)) * ph;
+
+    const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, height: H, role: "img", "aria-label": o.ariaLabel || "" }, container);
+
+    // grade e eixo y (à direita, convenção de gráficos financeiros)
+    for (const v of niceTicks(lo, hi, o.yTicks || 4)) {
+      if (v < lo || v > hi) continue;
+      el("line", { x1: m.l, x2: m.l + pw, y1: y(v), y2: y(v), stroke: "var(--grid)", "stroke-width": 1 }, svg);
+      const t = el("text", { x: m.l + pw + 8, y: y(v) + 4 }, svg);
+      t.textContent = o.fmtY(v);
+    }
+    if (o.baseline != null) {
+      el("line", { x1: m.l, x2: m.l + pw, y1: y(o.baseline), y2: y(o.baseline), stroke: "var(--axis)", "stroke-width": 1, "stroke-dasharray": "4 4" }, svg);
+    }
+
+    // eixo x
+    if (!o.hideX) {
+      for (const i of xTickIndices(n, Math.max(2, Math.floor(pw / 90)))) {
+        const t = el("text", { x: x(i), y: H - 6, "text-anchor": i === 0 ? "start" : i === n - 1 ? "end" : "middle" }, svg);
+        t.textContent = o.fmtX(o.times[i]);
+      }
+    }
+
+    // barras (volume)
+    if (o.bars) {
+      const bw = Math.max(1, pw / n - (pw / n > 4 ? 2 : 0.5));
+      const r = bw >= 6 ? 2 : 0;
+      o.bars.forEach((v, i) => {
+        const h = Math.max(0, m.t + ph - y(v));
+        if (h <= 0) return;
+        el("rect", { x: x(i) - bw / 2, y: y(v), width: bw, height: h, rx: r, fill: o.barColor || "var(--volume)" }, svg);
+      });
+    }
+
+    // linhas
+    for (const s of o.series) {
+      let d = "", started = false, first = null, lastI = null;
+      s.values.forEach((v, i) => {
+        if (v == null) { started = false; return; }
+        d += `${started ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`;
+        if (first == null) first = i;
+        lastI = i; started = true;
+      });
+      if (s.area && first != null) {
+        el("path", { d: `${d}L${x(lastI)},${m.t + ph}L${x(first)},${m.t + ph}Z`, fill: s.color, "fill-opacity": 0.1 }, svg);
+      }
+      el("path", { d, fill: "none", stroke: s.color, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }, svg);
+      if (s.endLabel && lastI != null) {
+        const t = el("text", { x: x(lastI) - 6, y: y(s.values[lastI]) - 8, "text-anchor": "end", class: "end-label" }, svg);
+        t.textContent = s.endLabel;
+      }
+    }
+
+    // camada de interação
+    const cross = el("line", { y1: m.t, y2: m.t + ph, stroke: "var(--axis)", "stroke-width": 1, visibility: "hidden" }, svg);
+    const dots = o.series.map(s => el("circle", { r: 4.5, fill: s.color, stroke: "var(--surface)", "stroke-width": 2, visibility: "hidden" }, svg));
+    const hit = el("rect", { x: m.l, y: 0, width: pw, height: H, fill: "transparent" }, svg);
+    const tip = document.createElement("div");
+    tip.className = "tooltip";
+    container.appendChild(tip);
+
+    const move = (ev) => {
+      const rect = svg.getBoundingClientRect();
+      const px = (ev.clientX - rect.left) * (W / rect.width);
+      const i = Math.max(0, Math.min(n - 1, Math.round(((px - m.l) / pw) * (n - 1))));
+      cross.setAttribute("x1", x(i)); cross.setAttribute("x2", x(i));
+      cross.setAttribute("visibility", "visible");
+      o.series.forEach((s, k) => {
+        const v = s.values[i];
+        dots[k].setAttribute("visibility", v == null ? "hidden" : "visible");
+        if (v != null) { dots[k].setAttribute("cx", x(i)); dots[k].setAttribute("cy", y(v)); }
+      });
+      tip.innerHTML = o.tooltip(i);
+      tip.classList.add("show");
+      const cx = x(i) * (rect.width / W);
+      const tw = tip.offsetWidth;
+      tip.style.left = `${cx > rect.width / 2 ? cx - tw - 12 : cx + 12}px`;
+      tip.style.top = `${Math.max(0, (ev.clientY - rect.top) - tip.offsetHeight / 2)}px`;
+    };
+    const leave = () => {
+      cross.setAttribute("visibility", "hidden");
+      dots.forEach(d => d.setAttribute("visibility", "hidden"));
+      tip.classList.remove("show");
+    };
+    hit.addEventListener("pointermove", move);
+    hit.addEventListener("pointerdown", move);
+    hit.addEventListener("pointerleave", leave);
+  }
+
+  function barChart(container, o) {
+    container.innerHTML = "";
+    const n = o.values.length;
+    if (!n) { container.innerHTML = '<div class="loading">Sem proventos registrados.</div>'; return; }
+    const W = container.clientWidth || 500, H = o.height || 240;
+    const m = { l: 4, r: 58, t: 22, b: 24 };
+    const pw = W - m.l - m.r, ph = H - m.t - m.b;
+    const hi = Math.max(...o.values) * 1.12 || 1;
+    const y = (v) => m.t + (1 - v / hi) * ph;
+    const slot = pw / n, bw = Math.max(4, Math.min(48, slot - 2 - slot * 0.3));
+    const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, height: H, role: "img", "aria-label": o.ariaLabel || "" }, container);
+
+    for (const v of niceTicks(0, hi, 4)) {
+      el("line", { x1: m.l, x2: m.l + pw, y1: y(v), y2: y(v), stroke: v === 0 ? "var(--axis)" : "var(--grid)", "stroke-width": 1 }, svg);
+      const t = el("text", { x: m.l + pw + 8, y: y(v) + 4 }, svg);
+      t.textContent = o.fmtY(v);
+    }
+    const tip = document.createElement("div");
+    tip.className = "tooltip";
+    container.appendChild(tip);
+
+    o.values.forEach((v, i) => {
+      const cx = m.l + slot * (i + 0.5), top = y(v), h = m.t + ph - top, r = Math.min(4, bw / 2, h);
+      const g = el("g", {}, svg);
+      // barra com cantos arredondados só no topo, ancorada na linha de base
+      el("path", {
+        d: `M${cx - bw / 2},${m.t + ph}V${top + r}Q${cx - bw / 2},${top} ${cx - bw / 2 + r},${top}` +
+           `H${cx + bw / 2 - r}Q${cx + bw / 2},${top} ${cx + bw / 2},${top + r}V${m.t + ph}Z`,
+        fill: o.partial?.[i] ? "none" : "var(--series-1)",
+        stroke: "var(--series-1)", "stroke-width": o.partial?.[i] ? 1.5 : 0,
+        "stroke-dasharray": o.partial?.[i] ? "3 2" : "",
+      }, g);
+      const lbl = el("text", { x: cx, y: H - 6, "text-anchor": "middle" }, g);
+      lbl.textContent = o.labels[i];
+      if (i === n - 1 || v === Math.max(...o.values)) {
+        const vl = el("text", { x: cx, y: top - 6, "text-anchor": "middle", class: "end-label" }, g);
+        vl.textContent = o.fmtValue(v);
+      }
+      const hit = el("rect", { x: cx - slot / 2, y: m.t, width: slot, height: ph + m.b, fill: "transparent" }, g);
+      const show = () => {
+        tip.innerHTML = o.tooltip(i);
+        tip.classList.add("show");
+        const rect = svg.getBoundingClientRect(), sx = rect.width / W;
+        const left = cx * sx;
+        tip.style.left = `${left > rect.width / 2 ? left - tip.offsetWidth - 12 : left + 12}px`;
+        tip.style.top = `${Math.max(0, top * sx - 20)}px`;
+      };
+      hit.addEventListener("pointerenter", show);
+      hit.addEventListener("pointerdown", show);
+      hit.addEventListener("pointerleave", () => tip.classList.remove("show"));
+    });
+  }
+
+  // ---------- Renderização ----------
+  const $ = (id) => document.getElementById(id);
+  const ttRow = (label, value, color) =>
+    `<div class="tt-row"><span>${color ? `<span class="swatch" style="background:${color}"></span>` : ""}${label}</span><b>${value}</b></div>`;
+
+  function showError(msg) {
+    const s = $("status");
+    s.hidden = !msg;
+    s.innerHTML = msg || "";
+  }
+
+  function renderHeader(daily, intraday) {
+    const meta = { ...daily.meta, ...(intraday?.meta || {}) };
+    tz = meta.exchangeTimezoneName || tz;
+    const cur = meta.currency;
+    const rows = daily.rows;
+    const lastRow = rows[rows.length - 1];
+    const price = meta.regularMarketPrice ?? lastRow.close;
+    const prev = intraday?.meta?.chartPreviousClose ?? meta.previousClose ?? rows[rows.length - 2]?.close;
+    const chg = price - prev, chgPct = prev ? chg / prev : null;
+
+    $("company").textContent = meta.longName || meta.shortName || "Vale S.A.";
+    $("exchange").textContent = `${meta.symbol} · ${meta.fullExchangeName || meta.exchangeName || ""} · ${cur}`;
+    $("price").textContent = money(price, cur);
+    $("change").innerHTML = `<span class="${dir(chg)}">${arrow(chg)}${chg > 0 ? "+" : ""}${fmt2.format(chg)} (${pct(chgPct)})</span>`;
+    const when = meta.regularMarketTime || lastRow.t;
+    $("when").textContent = `Último negócio em ${fmtDate(when)} às ${fmtTime(when)} (horário da bolsa) · fechamento anterior ${money(prev, cur)}`;
+    document.title = `${meta.symbol} ${money(price, cur)} · Vale Dashboard`;
+
+    // 52 semanas
+    const yearRows = rows.filter(r => r.t >= lastRow.t - 365 * DAY);
+    const lo52 = Math.min(...yearRows.map(r => r.low ?? r.close));
+    const hi52 = Math.max(...yearRows.map(r => r.high ?? r.close));
+    const pos = hi52 > lo52 ? (price - lo52) / (hi52 - lo52) : 0.5;
+
+    // proventos 12 meses
+    const div12 = daily.dividends.filter(d => d[0] >= lastRow.t - 365 * DAY).reduce((a, d) => a + d[1], 0);
+
+    const dayRows = intraday?.rows?.length ? intraday.rows : [lastRow];
+    const dayHigh = meta.regularMarketDayHigh ?? Math.max(...dayRows.map(r => r.high));
+    const dayLow = meta.regularMarketDayLow ?? Math.min(...dayRows.map(r => r.low));
+    const vol = meta.regularMarketVolume ?? lastRow.volume;
+    const avgVol = yearRows.slice(-21).reduce((a, r) => a + r.volume, 0) / Math.max(1, yearRows.slice(-21).length);
+
+    const tiles = [
+      { label: "Abertura", value: money(dayRows[0].open, cur), note: `Fech. anterior ${money(prev, cur)}` },
+      { label: "Máx. / mín. do dia", value: `${fmt2.format(dayHigh)} / ${fmt2.format(dayLow)}`, note: `Amplitude ${pct((dayHigh - dayLow) / dayLow)}` },
+      { label: "Volume", value: fmtCompact.format(vol), note: `Média 21 pregões: ${fmtCompact.format(avgVol)}` },
+      {
+        label: "Faixa de 52 semanas",
+        html: `<div class="range-bar" aria-hidden="true"><span style="left:${(pos * 100).toFixed(1)}%"></span></div>
+               <div class="range-ends"><span>${fmt2.format(lo52)}</span><span>${fmt2.format(hi52)}</span></div>`,
+        note: `${pct(price / hi52 - 1)} da máxima`,
+      },
+      { label: "Proventos (12 meses)", value: money(div12, cur), note: `Dividend yield ${pct(div12 / price).replace("+", "")}` },
+      { label: "Retorno em 12 meses", value: signed(returnSince(rows, lastRow.t - 365 * DAY)), note: "Com proventos reinvestidos" },
+    ];
+    $("tiles").innerHTML = tiles.map(t => `
+      <div class="card tile">
+        <div class="label">${t.label}</div>
+        ${t.html || `<div class="value">${t.value}</div>`}
+        <div class="note">${t.note}</div>
+      </div>`).join("");
+  }
+
+  async function renderPrice() {
+    const range = RANGES.find(r => r.key === state.range) || RANGES[3];
+    const data = await loadSeries(state.symbol, range.source);
+    const daily = await loadSeries(state.symbol, "daily");
+    const cur = data.meta.currency;
+    const intradayRange = range.source !== "daily";
+
+    // médias móveis calculadas sobre o histórico completo, depois recortadas
+    let rows, ma20 = [], ma50 = [];
+    if (intradayRange) {
+      rows = data.rows;
+    } else {
+      const all = daily.rows;
+      const closes = all.map(r => r.close);
+      const m20 = movingAverage(closes, 20), m50 = movingAverage(closes, 50);
+      rows = sliceRange(all, range);
+      const off = all.length - rows.length;
+      ma20 = m20.slice(off); ma50 = m50.slice(off);
+    }
+    const showMA = !intradayRange;
+    $("ma-legend").querySelectorAll("label").forEach(l => l.style.display = showMA ? "" : "none");
+
+    const times = rows.map(r => r.t);
+    const series = [{ name: "Preço", color: "var(--series-1)", values: rows.map(r => r.close), area: true }];
+    if (showMA && $("ma20").checked) series.push({ name: "MM20", color: "var(--series-2)", values: ma20 });
+    if (showMA && $("ma50").checked) series.push({ name: "MM50", color: "var(--series-3)", values: ma50 });
+
+    const longRange = range.days > 365 || range.key === "MAX";
+    const fmtX = intradayRange ? (range.key === "1D" ? fmtTime : fmtDateShort) : longRange ? fmtMonthYear : fmtDateShort;
+    const first = rows[0], last = rows[rows.length - 1];
+    const baseline = range.key === "1D" ? data.meta.chartPreviousClose : null;
+    const chgRef = baseline ?? first?.close;
+    if (last) {
+      $("price-sub").innerHTML = `Variação no período: ${signed(last.close / chgRef - 1)} · ${fmtDate(first.t)} a ${fmtDate(last.t)}`;
+    }
+
+    lineChart($("price-chart"), {
+      times, series, baseline, height: 280, hideX: true,
+      ariaLabel: `Gráfico de preço de ${state.symbol}`,
+      fmtY: v => fmt2.format(v), fmtX,
+      tooltip: (i) => {
+        const r = rows[i];
+        return `<div class="tt-title">${intradayRange ? fmtDateTime(r.t) : fmtDate(r.t)}</div>` +
+          ttRow("Fechamento", money(r.close, cur), "var(--series-1)") +
+          (series[1] ? ttRow(series[1].name, money(series[1].values[i], cur), series[1].color) : "") +
+          (series[2] ? ttRow(series[2].name, money(series[2].values[i], cur), series[2].color) : "") +
+          ttRow("Abertura", money(r.open, cur)) + ttRow("Máxima", money(r.high, cur)) +
+          ttRow("Mínima", money(r.low, cur)) + ttRow("Volume", fmtCompact.format(r.volume));
+      },
+    });
+    lineChart($("volume-chart"), {
+      times, series: [], bars: rows.map(r => r.volume), zeroBased: true, height: 80, hideX: false, yTicks: 2,
+      ariaLabel: "Volume negociado",
+      fmtY: v => fmtCompact.format(v), fmtX,
+      tooltip: (i) => `<div class="tt-title">${intradayRange ? fmtDateTime(rows[i].t) : fmtDate(rows[i].t)}</div>` +
+        ttRow("Volume", fmtCompact.format(rows[i].volume)),
+    });
+
+    await renderCompare(range);
+  }
+
+  async function renderCompare(range) {
+    const box = $("compare-chart");
+    let bench;
+    try { bench = await loadSeries(BENCHMARK, range.source); }
+    catch { box.innerHTML = '<div class="loading">Ibovespa indisponível.</div>'; return; }
+    const own = await loadSeries(state.symbol, range.source);
+    const keyOf = range.source === "daily" ? (r) => dayKey(r.t) : (r) => Math.round(r.t / 300);
+
+    const ownRows = range.source === "daily" ? sliceRange(own.rows, range) : own.rows;
+    const benchMap = new Map(bench.rows.map(r => [keyOf(r), r]));
+    const pairs = ownRows.map(r => [r, benchMap.get(keyOf(r))]).filter(p => p[1]);
+    if (pairs.length < 2) {
+      box.innerHTML = '<div class="loading">Sem pregões em comum com o Ibovespa neste período.</div>';
+      $("cmp-legend").innerHTML = "";
+      return;
+    }
+    const a0 = pairs[0][0].adj, b0 = pairs[0][1].adj;
+    const va = pairs.map(p => 100 * p[0].adj / a0), vb = pairs.map(p => 100 * p[1].adj / b0);
+    const ra = va[va.length - 1] / 100 - 1, rb = vb[vb.length - 1] / 100 - 1;
+    const name = state.symbol.replace(".SA", "");
+    $("cmp-legend").innerHTML =
+      `<span><span class="line-key" style="background:var(--series-1)"></span> ${name} ${signed(ra)}</span>` +
+      `<span><span class="line-key" style="background:var(--series-2)"></span> Ibovespa ${signed(rb)}</span>`;
+    const intradayRange = range.source !== "daily";
+    lineChart(box, {
+      times: pairs.map(p => p[0].t), height: 240, baseline: 100,
+      ariaLabel: `${name} comparado ao Ibovespa`,
+      series: [
+        { name, color: "var(--series-1)", values: va, endLabel: name },
+        { name: "Ibovespa", color: "var(--series-2)", values: vb, endLabel: "IBOV" },
+      ],
+      fmtY: v => fmt2.format(v),
+      fmtX: intradayRange ? (range.key === "1D" ? fmtTime : fmtDateShort) : (range.days > 365 || range.key === "MAX") ? fmtMonthYear : fmtDateShort,
+      tooltip: (i) => `<div class="tt-title">${intradayRange ? fmtDateTime(pairs[i][0].t) : fmtDate(pairs[i][0].t)}</div>` +
+        ttRow(name, signed(va[i] / 100 - 1), "var(--series-1)") +
+        ttRow("Ibovespa", signed(vb[i] / 100 - 1), "var(--series-2)"),
+    });
+  }
+
+  async function renderReturns(daily) {
+    let bench = null;
+    try { bench = await loadSeries(BENCHMARK, "daily"); } catch { /* sem benchmark */ }
+    const last = daily.rows[daily.rows.length - 1].t;
+    const ytdStart = (rows) => {
+      const y = fmtYear(last);
+      const i = rows.findIndex(r => fmtYear(r.t) === y);
+      return i > 0 ? rows[i - 1].t : rows[0].t;
+    };
+    const periods = [
+      ["1 mês", last - 30 * DAY], ["3 meses", last - 91 * DAY], ["6 meses", last - 182 * DAY],
+      ["No ano", null], ["12 meses", last - 365 * DAY], ["3 anos", last - 3 * 365 * DAY],
+      ["5 anos", last - 5 * 365 * DAY], ["10 anos", last - 10 * 365 * DAY],
+    ];
+    const name = state.symbol.replace(".SA", "");
+    $("returns-table").innerHTML =
+      `<thead><tr><th>Período</th><th>${name}</th>${bench ? "<th>Ibovespa</th><th>Diferença</th>" : ""}</tr></thead><tbody>` +
+      periods.map(([label, from]) => {
+        const a = returnSince(daily.rows, from ?? ytdStart(daily.rows));
+        const b = bench ? returnSince(bench.rows, from ?? ytdStart(bench.rows)) : null;
+        const diff = a != null && b != null ? (1 + a) / (1 + b) - 1 : null;
+        return `<tr><td>${label}</td><td>${signed(a)}</td>${bench ? `<td>${signed(b)}</td><td>${signed(diff)}</td>` : ""}</tr>`;
+      }).join("") + "</tbody>";
+
+    const y1 = daily.rows.filter(r => r.t >= last - 365 * DAY);
+    const y5 = daily.rows.filter(r => r.t >= last - 5 * 365 * DAY);
+    const tiles = [
+      { label: "Volatilidade (12m, anual.)", value: pct(annualVol(y1)).replace("+", "") },
+      { label: "Queda máxima (12m)", value: `<span class="down">${pct(maxDrawdown(y1))}</span>` },
+      { label: "Queda máxima (5 anos)", value: `<span class="down">${pct(maxDrawdown(y5))}</span>` },
+    ];
+    $("risk-tiles").innerHTML = tiles.map(t =>
+      `<div class="tile"><div class="label">${t.label}</div><div class="value">${t.value}</div></div>`).join("");
+  }
+
+  function renderDividends(daily) {
+    const cur = daily.meta.currency;
+    const byYear = new Map();
+    for (const [t, v] of daily.dividends) {
+      const y = fmtYear(t);
+      byYear.set(y, (byYear.get(y) || 0) + v);
+    }
+    const thisYear = fmtYear(daily.rows[daily.rows.length - 1].t);
+    const years = [];
+    for (let y = +thisYear - 9; y <= +thisYear; y++) years.push(String(y));
+    const values = years.map(y => byYear.get(y) || 0);
+    const partial = years.map(y => y === thisYear);
+    $("div-sub").textContent = `Soma dos proventos por ação (${cur}) · ${thisYear} parcial (barra tracejada)`;
+    barChart($("div-chart"), {
+      labels: years.map(y => `'${y.slice(2)}`), values, partial, height: 240,
+      ariaLabel: "Proventos por ano",
+      fmtY: v => fmt2.format(v), fmtValue: v => fmt2.format(v),
+      tooltip: (i) => `<div class="tt-title">${years[i]}${partial[i] ? " (parcial)" : ""}</div>` +
+        ttRow("Proventos", money(values[i], cur), "var(--series-1)") +
+        ttRow("Pagamentos", daily.dividends.filter(d => fmtYear(d[0]) === years[i]).length),
+    });
+    const recent = daily.dividends.slice(-12).reverse();
+    $("div-table").innerHTML = `<thead><tr><th>Data ex</th><th>Valor por ação</th></tr></thead><tbody>` +
+      (recent.length ? recent.map(d => `<tr><td>${fmtDate(d[0])}</td><td>${money(d[1], cur)}</td></tr>`).join("")
+        : `<tr><td colspan="2">Nenhum provento.</td></tr>`) + "</tbody>";
+  }
+
+  function renderHistory(daily) {
+    const cur = daily.meta.currency;
+    const rows = daily.rows.slice(-16);
+    const body = [];
+    for (let i = rows.length - 1; i >= 1; i--) {
+      const r = rows[i], chg = r.close / rows[i - 1].close - 1;
+      body.push(`<tr><td>${fmtDate(r.t)}</td><td>${fmt2.format(r.open)}</td><td>${fmt2.format(r.high)}</td>` +
+        `<td>${fmt2.format(r.low)}</td><td>${fmt2.format(r.close)}</td><td>${signed(chg)}</td><td>${fmtCompact.format(r.volume)}</td></tr>`);
+    }
+    $("hist-table").innerHTML = `<thead><tr><th>Data</th><th>Abertura</th><th>Máxima</th><th>Mínima</th>` +
+      `<th>Fech. (${cur})</th><th>Var.</th><th>Volume</th></tr></thead><tbody>${body.join("")}</tbody>`;
+  }
+
+  async function renderAll() {
+    showError("");
+    try {
+      const daily = await loadSeries(state.symbol, "daily");
+      let intraday = null;
+      try { intraday = await loadSeries(state.symbol, "intraday"); } catch { /* opcional */ }
+      renderHeader(daily, intraday);
+      renderDividends(daily);
+      renderHistory(daily);
+      await Promise.all([renderPrice(), renderReturns(daily)]);
+      if (daily.live) $("updated").textContent = "Dados carregados ao vivo via proxy.";
+    } catch (err) {
+      console.error(err);
+      showError(`<b>Não foi possível carregar os dados.</b> ${err.message || err}<br>
+        Rode <code>python scripts/fetch_data.py</code> para gerar a pasta <code>data/</code>
+        ou aguarde o workflow do GitHub Actions publicar o site.`);
+    }
+  }
+
+  // ---------- Controles ----------
+  function setupControls() {
+    const rangeSeg = $("range-seg");
+    rangeSeg.innerHTML = RANGES.map(r =>
+      `<button data-range="${r.key}" aria-pressed="${r.key === state.range}">${r.label}</button>`).join("");
+    rangeSeg.addEventListener("click", (e) => {
+      const b = e.target.closest("button"); if (!b) return;
+      state.range = b.dataset.range; store.set("vale.range", state.range);
+      rangeSeg.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b));
+      renderPrice().catch(err => showError(err.message));
+    });
+
+    const symSeg = $("symbol-seg");
+    symSeg.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x.dataset.symbol === state.symbol));
+    symSeg.addEventListener("click", (e) => {
+      const b = e.target.closest("button"); if (!b) return;
+      state.symbol = b.dataset.symbol; store.set("vale.symbol", state.symbol);
+      symSeg.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b));
+      renderAll();
+    });
+
+    ["ma20", "ma50"].forEach(id => {
+      $(id).checked = store.get(`vale.${id}`) === "1";
+      $(id).addEventListener("change", () => { store.set(`vale.${id}`, $(id).checked ? "1" : "0"); renderPrice(); });
+    });
+
+    const savedTheme = store.get("vale.theme");
+    if (savedTheme) document.documentElement.dataset.theme = savedTheme;
+    $("theme-btn").addEventListener("click", () => {
+      const dark = document.documentElement.dataset.theme
+        ? document.documentElement.dataset.theme === "dark"
+        : matchMedia("(prefers-color-scheme: dark)").matches;
+      const next = dark ? "light" : "dark";
+      document.documentElement.dataset.theme = next;
+      store.set("vale.theme", next);
+    });
+
+    let lastW = 0, timer;
+    new ResizeObserver(([entry]) => {
+      const w = Math.round(entry.contentRect.width);
+      if (!lastW || w === lastW) { lastW = w; return; }
+      lastW = w;
+      clearTimeout(timer);
+      timer = setTimeout(() => renderAll(), 150);
+    }).observe(document.body);
+  }
+
+  async function showUpdated() {
+    try {
+      const r = await fetch("data/manifest.json", { cache: "no-cache" });
+      const m = await r.json();
+      const d = new Date(m.updatedAt);
+      $("updated").textContent = `Dados atualizados em ${d.toLocaleString("pt-BR")}.`;
+    } catch { /* manifest opcional */ }
+  }
+
+  setupControls();
+  renderAll();
+  showUpdated();
+})();
+</script>
+</body>
+</html>
